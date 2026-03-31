@@ -1,13 +1,17 @@
+import "dotenv/config";
 import { PrismaClient, Role } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
 
-const prisma = new PrismaClient();
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   console.log("🌱 シードデータを投入します...");
 
   // ---------- Users ----------
-  const passwordHash = await bcrypt.hash("password123", 12);
+  // 開発用パスワード: "password123"（全ユーザー共通）
+  const passwordHash = await bcrypt.hash("password123", 10);
 
   const manager = await prisma.user.upsert({
     where: { email: "manager@example.com" },
@@ -45,37 +49,37 @@ async function main() {
   console.log(`  ✓ ユーザー: ${manager.name}, ${salesperson1.name}, ${salesperson2.name}`);
 
   // ---------- Customers ----------
-  const customer1 = await prisma.customer.upsert({
-    where: { id: 1 },
-    update: {},
-    create: {
-      companyName: "株式会社サンプル商事",
-      contactName: "田中 部長",
-      phone: "03-0000-0001",
-      address: "東京都千代田区丸の内1-1-1",
-    },
-  });
+  // customers に unique な自然キーがないため deleteMany + create で冪等性を確保
+  await prisma.comment.deleteMany({});
+  await prisma.visitRecord.deleteMany({});
+  await prisma.dailyReport.deleteMany({});
+  await prisma.customer.deleteMany({});
 
-  const customer2 = await prisma.customer.upsert({
-    where: { id: 2 },
-    update: {},
-    create: {
-      companyName: "テスト工業株式会社",
-      contactName: "中村 課長",
-      phone: "06-0000-0002",
-      address: "大阪府大阪市北区梅田2-2-2",
-    },
-  });
-
-  const customer3 = await prisma.customer.upsert({
-    where: { id: 3 },
-    update: {},
-    create: {
-      companyName: "サンプル電機",
-      contactName: "小林 様",
-      phone: "052-000-0003",
-    },
-  });
+  const [customer1, customer2, customer3] = await Promise.all([
+    prisma.customer.create({
+      data: {
+        companyName: "株式会社サンプル商事",
+        contactName: "田中 部長",
+        phone: "03-0000-0001",
+        address: "東京都千代田区丸の内1-1-1",
+      },
+    }),
+    prisma.customer.create({
+      data: {
+        companyName: "テスト工業株式会社",
+        contactName: "中村 課長",
+        phone: "06-0000-0002",
+        address: "大阪府大阪市北区梅田2-2-2",
+      },
+    }),
+    prisma.customer.create({
+      data: {
+        companyName: "サンプル電機",
+        contactName: "小林 様",
+        phone: "052-000-0003",
+      },
+    }),
+  ]);
 
   console.log(
     `  ✓ 顧客: ${customer1.companyName}, ${customer2.companyName}, ${customer3.companyName}`,
@@ -85,10 +89,8 @@ async function main() {
   const today = new Date("2026-03-31");
   const yesterday = new Date("2026-03-30");
 
-  const report1 = await prisma.dailyReport.upsert({
-    where: { userId_reportDate: { userId: salesperson1.id, reportDate: today } },
-    update: {},
-    create: {
+  const report1 = await prisma.dailyReport.create({
+    data: {
       userId: salesperson1.id,
       reportDate: today,
       problem: "株式会社サンプル商事の予算決裁が来月に延期。早期受注に向けてフォローが必要。",
@@ -110,10 +112,8 @@ async function main() {
     },
   });
 
-  const report2 = await prisma.dailyReport.upsert({
-    where: { userId_reportDate: { userId: salesperson1.id, reportDate: yesterday } },
-    update: {},
-    create: {
+  const report2 = await prisma.dailyReport.create({
+    data: {
       userId: salesperson1.id,
       reportDate: yesterday,
       problem: "テスト工業の担当者が変更になり、関係構築が必要。",
@@ -130,10 +130,8 @@ async function main() {
     },
   });
 
-  const report3 = await prisma.dailyReport.upsert({
-    where: { userId_reportDate: { userId: salesperson2.id, reportDate: today } },
-    update: {},
-    create: {
+  const report3 = await prisma.dailyReport.create({
+    data: {
       userId: salesperson2.id,
       reportDate: today,
       problem: "特になし",
@@ -153,21 +151,23 @@ async function main() {
   console.log(`  ✓ 日報: ${report1.id}, ${report2.id}, ${report3.id}`);
 
   // ---------- Comments ----------
-  const comment1 = await prisma.comment.create({
-    data: {
-      dailyReportId: report1.id,
-      userId: manager.id,
-      content: "サンプル商事の件、来週フォローする際は決裁フローも確認してください。",
-    },
-  });
-
-  const comment2 = await prisma.comment.create({
-    data: {
-      dailyReportId: report2.id,
-      userId: manager.id,
-      content: "新担当者へのアプローチ、引き続きよろしくお願いします。資料が必要なら連絡を。",
-    },
-  });
+  // comment は上の deleteMany で既にクリア済みのため create で追加
+  const [comment1, comment2] = await Promise.all([
+    prisma.comment.create({
+      data: {
+        dailyReportId: report1.id,
+        userId: manager.id,
+        content: "サンプル商事の件、来週フォローする際は決裁フローも確認してください。",
+      },
+    }),
+    prisma.comment.create({
+      data: {
+        dailyReportId: report2.id,
+        userId: manager.id,
+        content: "新担当者へのアプローチ、引き続きよろしくお願いします。資料が必要なら連絡を。",
+      },
+    }),
+  ]);
 
   console.log(`  ✓ コメント: ${comment1.id}, ${comment2.id}`);
   console.log("✅ シードデータの投入が完了しました。");
