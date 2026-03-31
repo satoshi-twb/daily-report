@@ -68,6 +68,13 @@ export default [
       "prefer-const": "error",
     },
   },
+  // Prisma スクリプト（seed, config）は console を許可
+  {
+    files: ["prisma/**/*.ts"],
+    rules: {
+      "no-console": "off",
+    },
+  },
   // Prettierとの競合ルールを無効化（必ず最後に記述）
   prettierConfig,
   {

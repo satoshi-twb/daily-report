@@ -29,6 +29,7 @@
   },
   "include": [
     "./src",
+    "./prisma/*.ts",
     "./next-env.d.ts",
     "next.config.ts",
     "vitest.config.ts",
