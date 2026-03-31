@@ -1,0 +1,13 @@
+.git
+.github
+.next
+.husky
+node_modules
+*.md
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+Makefile
+.env*
+!.env.example
