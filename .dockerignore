@@ -2,6 +2,7 @@
 .github
 .next
 .husky
+.claude
 node_modules
 *.md
 *.test.ts
@@ -11,3 +12,7 @@ node_modules
 Makefile
 .env*
 !.env.example
+# seed スクリプトは本番イメージに含めない
+prisma/seed.ts
+# カバレッジ・テスト成果物
+coverage
