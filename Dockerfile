@@ -9,6 +9,10 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Prisma Client を生成してから Next.js をビルド
+# DATABASE_URL はビルド時には不要（接続しないため dummy を渡す）
+RUN DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy \
+    npx prisma generate --config prisma/config.ts
 RUN npm run build
 
 # ---- runner ----

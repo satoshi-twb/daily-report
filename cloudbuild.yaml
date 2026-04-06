@@ -1,0 +1,54 @@
+steps:
+  # Docker イメージをビルド
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - build
+      - "-t"
+      - "${_REGISTRY}/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${SHORT_SHA}"
+      - "-t"
+      - "${_REGISTRY}/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:latest"
+      - "."
+
+  # Artifact Registry へプッシュ
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - push
+      - "--all-tags"
+      - "${_REGISTRY}/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}"
+
+  # Cloud Run へデプロイ
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - "${_SERVICE_NAME}"
+      - "--image=${_REGISTRY}/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${SHORT_SHA}"
+      - "--region=${_REGION}"
+      - "--platform=managed"
+      - "--allow-unauthenticated"
+      - "--add-cloudsql-instances=${PROJECT_ID}:${_REGION}:${_CLOUDSQL_INSTANCE}"
+      - "--set-secrets=DATABASE_URL=${_SECRET_DATABASE_URL}:latest,NEXTAUTH_SECRET=${_SECRET_NEXTAUTH_SECRET}:latest"
+      - "--set-env-vars=NEXTAUTH_URL=${_NEXTAUTH_URL},NODE_ENV=production"
+      - "--memory=512Mi"
+      - "--cpu=1"
+      - "--min-instances=0"
+      - "--max-instances=10"
+      - "--timeout=60"
+
+substitutions:
+  _REGISTRY: asia-northeast1-docker.pkg.dev
+  _REGION: asia-northeast1
+  _SERVICE_NAME: daily-report
+  _CLOUDSQL_INSTANCE: daily-report-db
+  _SECRET_DATABASE_URL: daily-report-database-url
+  _SECRET_NEXTAUTH_SECRET: daily-report-nextauth-secret
+  _NEXTAUTH_URL: https://daily-report-xxxxx-an.a.run.app
+
+images:
+  - "${_REGISTRY}/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${SHORT_SHA}"
+  - "${_REGISTRY}/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:latest"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
